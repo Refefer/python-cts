@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+import sys
+import os.path
+from itertools import islice
+from optparse import OptionParser
+from collections import namedtuple
+import ctags
+
+def build_arg_parser():
+    usage = "usage: %prog [-pi] name"
+    parser = OptionParser()
+    parser.add_option("-p", "--partial", dest="partial", help="Partial match on ctag",
+                      action="store_true", default=False)
+    parser.add_option("-i", "--insensitive", dest="insensitive", 
+                      help="Case insensitive search on ctag",
+                      action="store_true", default=False)
+    parser.add_option("-c", "--ctag_file", dest="tag_file",
+                      help="Specify a CTAG file to use", default="")
+    parser.add_option("-f", "--force", dest="force",
+                      help="Forces ct to use a ctag file even if it looks invalid", 
+                      action="store_true", default=False)
+    return parser
+
+def rec_dir_up(dir):
+    if os.path.isdir(dir):
+        while True:
+            yield dir
+            newdir = os.path.split(dir)[0]
+            if newdir == dir: break
+            dir = newdir
+
+def find_ctag_file():
+    directory = os.getcwd()
+    for dir in rec_dir_up(directory):
+        path = os.path.join(dir, "tags")
+        if os.path.isfile(path):
+            return path
+
+    return None
+
+def build_flags(partial, insensitive):
+    search_type = ctags.TAG_PARTIALMATCH if partial else ctags.TAG_FULLMATCH
+    case = ctags.TAG_IGNORECASE if insensitive else ctags.TAG_OBSERVECASE
+    return search_type | case
+
+Entry = namedtuple("Entry", "name, file, pattern, lineNumber, kind, fileScope")
+def entry_to_Entry(entry):
+    return Entry(*(entry[f] for f in Entry._fields))
+
+def query_tag_file(tags, query, partial, insensitive):
+    results = []
+    entry = ctags.TagEntry()
+    flags = build_flags(partial, insensitive)
+
+    if tags.find(entry, query, flags):
+        results.append(entry_to_Entry(entry))
+        while tags.findNext(entry):
+            results.append(entry_to_Entry(entry))
+
+    return results
+
+def select_entry(entries):
+    idx = 0
+    # display in chunks of 10
+    i_entries = list(enumerate(entries))
+    while True:
+        print_set = []
+        for i, entry in i_entries[idx:idx+10]:
+            fields = (entry.name, entry.file, entry.pattern)
+            print_set.append(" %d: %s" % (i,'\t'.join(fields)))
+            
+        instructions = ["Select number to open"]
+        not_at_end = (idx + 10) < len(entries)
+        if not_at_end:
+            instructions.append("'m' for more")
+        if idx > 0:
+            instructions.append("'p' for prev")
+
+        print '\n\n'.join(print_set)
+        print
+        print ', '.join(instructions)
+
+        # Get the input
+        results = raw_input("> ")
+        if results.isdigit():
+            linenum = int(results)
+            if linenum < len(entries):
+                return entries[linenum]
+        elif results == 'm' and not_at_end:
+            idx += 1
+        elif results == 'p' and idx > 0:
+            idx -=1
+ 
+def validate(tag_file):
+    # we need attempt to verify that the file is actually a ctags file
+    # since 'python-ctags' segfaults if it isn't
+    valid = 1
+    with file(tag_file) as f:
+        valid &= "_TAG_FILE_FORMAT" in f.readline()
+        valid &= "_TAG_FILE_SORTED" in f.readline()
+
+    return valid
+    
+if __name__ == '__main__':
+    parser = build_arg_parser()
+    opts, args = parser.parse_args()
+
+    if not args:
+        print "Missing search string"
+        parser.print_usage()
+        sys.exit(1)
+
+    # find the nearest ctag file
+    tag_file = opts.tag_file or find_ctag_file()
+    if tag_file is None or not os.path.isfile(tag_file):
+        print "Could not find tag_file"
+        sys.exit(1)
+    
+    if not validate(tag_file) and not options.force:
+        print "file %s Does not look like a ctag file.  Aborting." % tag_file
+        sys.exit(1)
+
+    query = args[0]
+    results = query_tag_file(ctags.CTags(tag_file), query, 
+                             opts.partial, opts.insensitive)
+    
+    if not results:
+        print "No tags for `%s` found." % query
+        sys.exit(0)
+    
+    entry = None
+    if len(results) == 1:
+        entry = results[0]
+    else:
+        try:
+            entry = select_entry(results)
+        except KeyboardInterrupt:
+            sys.exit(1)
+
+    if entry is not None:
+        tag_dir = os.path.split(tag_file)[0]
+        filename = os.path.join(tag_dir, entry.file)
+        editor = os.environ['EDITOR']
+        os.execvp(editor, [editor, "+%d" % entry.lineNumber, filename])
+
