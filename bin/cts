@@ -8,7 +8,7 @@ import ctags
 
 def build_arg_parser():
     usage = "usage: %prog [-pi] name"
-    parser = OptionParser()
+    parser = OptionParser(usage=usage)
     parser.add_option("-p", "--partial", dest="partial", help="Partial match on ctag",
                       action="store_true", default=False)
     parser.add_option("-i", "--insensitive", dest="insensitive", 
