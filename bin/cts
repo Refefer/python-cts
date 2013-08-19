@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import shlex
 import os.path
 from itertools import islice,ifilter
 from optparse import OptionParser
@@ -48,6 +49,16 @@ def build_arg_parser():
     parser.add_option("-t", "--file-types", dest="types", 
                       help="CSV list of file suffixes to include in search.",
                       default=None)
+    
+    parser.add_option("-e", "--exec", dest="execute",
+                      help="Executes a command using execv, filling in the "\
+                           "appropriate variables.  Default opens in $EDITOR", 
+                      default="%s +{lineNumber} {file}" % os.environ['EDITOR'])
+
+    parser.add_option("-s", "--print-std", dest="stdout",
+                      help="Instead of executing program, prints the formated string "\
+                           "to stdout", default=None)
+
     return parser
 
 class EntryFilter(object):
@@ -206,12 +217,19 @@ if __name__ == '__main__':
     else:
         try:
             entry = select_entry(results)
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt,EOFError),e:
             sys.exit(1)
 
-    if entry is not None:
-        tag_dir = os.path.split(tag_file)[0]
-        filename = os.path.join(tag_dir, entry.file)
-        editor = os.environ['EDITOR']
-        os.execvp(editor, [editor, "+%d" % entry.lineNumber, filename])
+    # Prepare execution of script
+    tag_dir = os.path.split(tag_file)[0]
+    filename = os.path.join(tag_dir, entry.file)
+    variables = entry.__dict__.copy()
+    variables['file'] = filename 
+    if opts.stdout is not None:
+        print opts.stdout.format(**variables)
+        sys.exit(0)
+
+    pieces = shlex.split(opts.execute.format(**variables))
+    if pieces:
+        os.execvp(pieces[0], pieces)
 
