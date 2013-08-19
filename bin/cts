@@ -65,12 +65,13 @@ def select_entry(entries):
     i_entries = list(enumerate(entries))
     while True:
         print_set = []
-        for i, entry in i_entries[idx:idx+10]:
+        midx = idx * 10
+        for i, entry in i_entries[midx:midx+10]:
             fields = (entry.name, entry.file, entry.pattern)
             print_set.append(" %d: %s" % (i,'\t'.join(fields)))
             
         instructions = ["Select number to open"]
-        not_at_end = (idx + 10) < len(entries)
+        not_at_end = (midx + 10) < len(entries)
         if not_at_end:
             instructions.append("'m' for more")
         if idx > 0:
