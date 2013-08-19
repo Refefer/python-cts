@@ -1,25 +1,63 @@
 #!/usr/bin/env python
 import sys
 import os.path
-from itertools import islice
+from itertools import islice,ifilter
 from optparse import OptionParser
 from collections import namedtuple
 import ctags
 
+KINDS = {
+    "c": "class name",
+    "d": "define (from #define XXX)",
+    "e": "enumerator",
+    "f": "function or method name",
+    "F": "file name",
+    "g": "enumeration name",
+    "m": "member (of structure or class data)",
+    "p": "function prototype",
+    "s": "structure name",
+    "t": "typedef",
+    "u": "union name",
+    "v": "variable",
+}
 def build_arg_parser():
-    usage = "usage: %prog [-pi] name"
+    usage = "usage: %prog [-picfk] name"
     parser = OptionParser(usage=usage)
     parser.add_option("-p", "--partial", dest="partial", help="Partial match on ctag",
                       action="store_true", default=False)
+
     parser.add_option("-i", "--insensitive", dest="insensitive", 
                       help="Case insensitive search on ctag",
                       action="store_true", default=False)
+
     parser.add_option("-c", "--ctag_file", dest="tag_file",
                       help="Specify a CTAG file to use", default="")
+
     parser.add_option("-f", "--force", dest="force",
                       help="Forces cts to use a ctag file even if it looks invalid", 
                       action="store_true", default=False)
+
+    parser.add_option("-k", "--restrict-kinds", dest="kinds",
+                      help="Restricts tags to only show certain one or more tag types", 
+                      default=None)
+
+    parser.add_option("-l", "--list-kinds", dest="listkinds", 
+                      help="List descriptive ctags types",
+                      action="store_true", default=False)
     return parser
+
+class EntryFilter(object):
+    def __init__(self):
+        self.kinds = None
+
+    def add_kinds_filter(self, kinds):
+        self.kinds = frozenset(kinds)
+
+    def filter(self, entry_set):
+        if self.kinds is not None:
+            entry_set = ifilter(lambda e: e.kind in self.kinds, entry_set)
+
+        return list(entry_set)
 
 def rec_dir_up(dir):
     if os.path.isdir(dir):
@@ -106,6 +144,13 @@ if __name__ == '__main__':
     parser = build_arg_parser()
     opts, args = parser.parse_args()
 
+    if opts.listkinds:
+        print "Tag Kinds"
+        for k in sorted(KINDS.iterkeys()):
+            print "%s\t%s" % (k, KINDS[k])
+
+        sys.exit(0)
+
     if not args:
         print "Missing search string"
         parser.print_usage()
@@ -124,6 +169,13 @@ if __name__ == '__main__':
     query = args[0]
     results = query_tag_file(ctags.CTags(tag_file), query, 
                              opts.partial, opts.insensitive)
+
+    # filter results
+    entryFilter = EntryFilter()
+    if opts.kinds is not None:
+        entryFilter.add_kinds_filter(opts.kinds)
+
+    results = entryFilter.filter(results)
     
     if not results:
         print "No tags for `%s` found." % query
