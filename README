@@ -1,0 +1,14 @@
+To Install
+----------
+1. Checkout the repo
+2. python setup.py bdist
+3. sudo pip install dist/python-cts.0.1.tar.gz
+4. Profit!
+
+Usage
+-----
+
+'python-cts' adds a new script, 'cts', which searches ctag files for your query and then opens them.
+
+Type 'cts -h' to get usage information
+
