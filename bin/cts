@@ -21,7 +21,7 @@ KINDS = {
     "v": "variable",
 }
 def build_arg_parser():
-    usage = "usage: %prog [-picfk] name"
+    usage = "usage: %prog [-flags] name"
     parser = OptionParser(usage=usage)
     parser.add_option("-p", "--partial", dest="partial", help="Partial match on ctag",
                       action="store_true", default=False)
@@ -44,18 +44,34 @@ def build_arg_parser():
     parser.add_option("-l", "--list-kinds", dest="listkinds", 
                       help="List descriptive ctags types",
                       action="store_true", default=False)
+
+    parser.add_option("-t", "--file-types", dest="types", 
+                      help="CSV list of file suffixes to include in search.",
+                      default=None)
     return parser
 
 class EntryFilter(object):
     def __init__(self):
         self.kinds = None
+        self.fileTypes = None
 
     def add_kinds_filter(self, kinds):
         self.kinds = frozenset(kinds)
 
+    def add_file_types_filter(self, fts):
+        if isinstance(fts, basestring):
+            fts = fts.split(",") 
+
+        self.fileTypes = set(fts)
+
     def filter(self, entry_set):
         if self.kinds is not None:
             entry_set = ifilter(lambda e: e.kind in self.kinds, entry_set)
+
+        if self.fileTypes is not None:
+            sp = os.path.splitext
+            filterfn = lambda e: sp(e.file)[1][1:] in self.fileTypes 
+            entry_set = ifilter(filterfn, entry_set)
 
         return list(entry_set)
 
@@ -174,6 +190,9 @@ if __name__ == '__main__':
     entryFilter = EntryFilter()
     if opts.kinds is not None:
         entryFilter.add_kinds_filter(opts.kinds)
+
+    if opts.types is not None:
+        entryFilter.add_file_types_filter(opts.types)
 
     results = entryFilter.filter(results)
     
