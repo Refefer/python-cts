@@ -1,4 +1,8 @@
-To Install
+To Install (From Pip)
+----------
+sudo pip install python-cts
+
+To Install (From Source)
 ----------
 1. Checkout the repo
 2. python setup.py bdist
