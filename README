@@ -1,13 +1,14 @@
 To Install (From Pip)
 ----------
+
 sudo pip install python-cts
 
 To Install (From Source)
 ----------
+
 1. Checkout the repo
-2. python setup.py bdist
-3. sudo pip install dist/python-cts.0.1.tar.gz
-4. Profit!
+2. python setup.py install
+3. Profit!
 
 Usage
 -----
