@@ -17,7 +17,7 @@ def build_arg_parser():
     parser.add_option("-c", "--ctag_file", dest="tag_file",
                       help="Specify a CTAG file to use", default="")
     parser.add_option("-f", "--force", dest="force",
-                      help="Forces ct to use a ctag file even if it looks invalid", 
+                      help="Forces cts to use a ctag file even if it looks invalid", 
                       action="store_true", default=False)
     return parser
 
