@@ -1,0 +1,3 @@
+include bin/cts 
+include README.md LICENSE
+include setup.py setup.cfg 
