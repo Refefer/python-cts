@@ -4,6 +4,8 @@ Description
 
 Since 'cts' is only as good as your ctag files, it is recommended running ctags with '--extra=+f' so as to index filenames as well.  This will let you do 'cts Foo.java' to automatically open up Foo.java in your editor of choice.
 
+Alternatively, one can add a new line, '--extra=+f', to ~/.ctags to set it as a default option for the ctags command.  This is likely a better solution as it will also work with scripts, editors, and other out-of-band processes.
+
 Example 1
 -------
     cts bar -i -c /some/directory/tags
