@@ -24,11 +24,17 @@ KINDS = {
 def build_arg_parser():
     usage = "usage: %prog [-flags] name"
     parser = OptionParser(usage=usage)
-    parser.add_option("-p", "--partial", dest="partial", help="Partial match on ctag",
+    parser.add_option("-p", "--partial", dest="partial", 
+                      help="Substring match on a query.  This will perform a linear scan.",
+                      action="store_true", default=False)
+
+    parser.add_option("-r", "--prefix", dest="prefix", 
+                      help="Does a prefix search on query.  This is logarithmic if case "\
+                           "sensitive",
                       action="store_true", default=False)
 
     parser.add_option("-i", "--insensitive", dest="insensitive", 
-                      help="Case insensitive search on ctag",
+                      help="Case insensitive search on ctag, linear scan.",
                       action="store_true", default=False)
 
     parser.add_option("-c", "--ctag_file", dest="tag_file",
@@ -72,6 +78,8 @@ class EntryFilter(object):
     def __init__(self):
         self.kinds = None
         self.fileTypes = None
+        self.partial = None
+        self.insensitive = None
 
     def add_kinds_filter(self, kinds):
         self.kinds = frozenset(kinds)
@@ -82,6 +90,10 @@ class EntryFilter(object):
 
         self.fileTypes = set(fts)
 
+    def add_partial_filter(self, query, insensenitive):
+        self.insensenitive = insensenitive
+        self.partial = query.lower() if self.insensenitive else query
+
     def filter(self, entry_set):
         if self.kinds is not None:
             entry_set = ifilter(lambda e: e.kind in self.kinds, entry_set)
@@ -90,6 +102,11 @@ class EntryFilter(object):
             sp = os.path.splitext
             filterfn = lambda e: sp(e.file)[1][1:] in self.fileTypes 
             entry_set = ifilter(filterfn, entry_set)
+
+        if self.partial is not None:
+            ins = self.insensenitive
+            inName = lambda e: self.partial in (e.name.lower() if ins else e.name)
+            entry_set = ifilter(inName, entry_set)
 
         return list(entry_set)
 
@@ -120,16 +137,13 @@ def entry_to_Entry(entry):
     return Entry(*(entry[f] for f in Entry._fields))
 
 def query_tag_file(tags, query, partial, insensitive):
-    results = []
     entry = ctags.TagEntry()
     flags = build_flags(partial, insensitive)
 
     if tags.find(entry, query, flags):
-        results.append(entry_to_Entry(entry))
+        yield entry_to_Entry(entry)
         while tags.findNext(entry):
-            results.append(entry_to_Entry(entry))
-
-    return results
+            yield entry_to_Entry(entry)
 
 def select_entry(entries, num):
     idx = 0
@@ -163,6 +177,13 @@ def select_entry(entries, num):
             idx += 1
         elif results == 'p' and idx > 0:
             idx -=1
+
+def get_all_entries(tag_file):
+    entry = ctags.TagEntry()
+    if tags.first(entry):
+        yield entry_to_Entry(entry)
+        while tags.next(entry):
+            yield entry_to_Entry(entry)
  
 def validate(tag_file):
     # we need attempt to verify that the file is actually a ctags file
@@ -201,8 +222,12 @@ if __name__ == '__main__':
         sys.exit(1)
 
     query = args[0]
-    results = query_tag_file(ctags.CTags(tag_file), query, 
-                             opts.partial, opts.insensitive)
+    tags = ctags.CTags(tag_file)
+    if not opts.partial:
+        results = query_tag_file(tags, query, 
+                                 opts.prefix, opts.insensitive)
+    else:
+        results = get_all_entries(tags)
 
     # filter results
     entryFilter = EntryFilter()
@@ -211,6 +236,9 @@ if __name__ == '__main__':
 
     if opts.types is not None:
         entryFilter.add_file_types_filter(opts.types)
+
+    if opts.partial:
+        entryFilter.add_partial_filter(query, opts.insensitive)
 
     results = entryFilter.filter(results)
     
