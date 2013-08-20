@@ -32,7 +32,8 @@ def build_arg_parser():
                       action="store_true", default=False)
 
     parser.add_option("-c", "--ctag_file", dest="tag_file",
-                      help="Specify a CTAG file to use", default="")
+                      help="If provided, specifies a CTAG file to use instead "\
+                           "of recursing up from the current directory", default="")
 
     parser.add_option("-f", "--force", dest="force",
                       help="Forces cts to use a ctag file even if it looks invalid", 
@@ -43,21 +44,27 @@ def build_arg_parser():
                       default=None)
 
     parser.add_option("-l", "--list-kinds", dest="listkinds", 
-                      help="List descriptive ctags types",
+                      help="Lists default descriptive ctags types.  This is not an " \
+                           "exhaustive list",
                       action="store_true", default=False)
 
     parser.add_option("-t", "--file-types", dest="types", 
-                      help="CSV list of file suffixes to include in search.",
+                      help="CSV list of file suffixes to include in search",
                       default=None)
     
     parser.add_option("-e", "--exec", dest="execute",
                       help="Executes a command using execv, filling in the "\
                            "appropriate variables.  Default opens in $EDITOR", 
-                      default="%s +{lineNumber} {file}" % os.environ['EDITOR'])
+                      default='%s +"{pattern}" {file}' % os.environ['EDITOR'])
 
     parser.add_option("-s", "--print-std", dest="stdout",
                       help="Instead of executing program, prints the formated string "\
                            "to stdout", default=None)
+
+    parser.add_option("-n", "--num", dest="num", type="int",
+                      help="Number of tags to show at a time.  Default is 5",
+                      default=5)
+                        
 
     return parser
 
@@ -124,19 +131,19 @@ def query_tag_file(tags, query, partial, insensitive):
 
     return results
 
-def select_entry(entries):
+def select_entry(entries, num):
     idx = 0
-    # display in chunks of 10
+    # display in chunks of num
     i_entries = list(enumerate(entries))
     while True:
         print_set = []
-        midx = idx * 10
-        for i, entry in i_entries[midx:midx+10]:
+        midx = idx * num
+        for i, entry in i_entries[midx:midx+num]:
             fields = (entry.name, entry.file, entry.pattern)
             print_set.append(" %d: %s" % (i,'\t'.join(fields)))
             
         instructions = ["Select number to open"]
-        not_at_end = (midx + 10) < len(entries)
+        not_at_end = (midx + num) < len(entries)
         if not_at_end:
             instructions.append("'m' for more")
         if idx > 0:
@@ -216,7 +223,7 @@ if __name__ == '__main__':
         entry = results[0]
     else:
         try:
-            entry = select_entry(results)
+            entry = select_entry(results, opts.num)
         except (KeyboardInterrupt,EOFError),e:
             sys.exit(1)
 
