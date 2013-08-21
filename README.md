@@ -36,7 +36,12 @@ indicates to filter out everything that isn't kind 'c', or class definitions.
 To Install (From Pip)
 ----------
 
-pip install python-cts
+    pip install python-cts
+
+If upgrading:
+    
+    pip install python-cts --upgrade
+
 
 To Install (From Source)
 ----------
