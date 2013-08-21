@@ -97,7 +97,9 @@ class EntryFilter(object):
         self.insensenitive = insensenitive
         self.partial = query.lower() if self.insensenitive else query
 
-    def filter(self, entry_set):
+    def ifilter(self, entry_set):
+        # Filter out entries for files that no longer exist
+        entries = ifilter(lambda e: os.path.isfile(e.file), entry_set)
         if self.kinds is not None:
             entry_set = ifilter(lambda e: e.kind in self.kinds, entry_set)
 
@@ -111,7 +113,7 @@ class EntryFilter(object):
             inName = lambda e: self.partial in (e.name.lower() if ins else e.name)
             entry_set = ifilter(inName, entry_set)
 
-        return list(entry_set)
+        return entry_set
 
 def rec_dir_up(dir):
     if os.path.isdir(dir):
@@ -166,8 +168,6 @@ def get_details(cache, entry, surrounding):
     return cache[entry]
 
 def select_entry(entries, num, surrounding=True):
-    # Filter out entries for files that no longer exist
-    entries = [e for e in entries if os.path.isfile(e.file)]
     idx = 0
 
     # display in chunks of num
@@ -267,7 +267,7 @@ if __name__ == '__main__':
     if opts.partial:
         entryFilter.add_partial_filter(query, opts.insensitive)
 
-    results = entryFilter.filter(results)
+    results = list(entryFilter.ifilter(results))
     
     if not results:
         print "No tags for `%s` found." % query
