@@ -70,7 +70,10 @@ def build_arg_parser():
     parser.add_option("-n", "--num", dest="num", type="int",
                       help="Number of tags to show at a time.  Default is 5",
                       default=5)
-                        
+
+    parser.add_option("-R", "--no-read", dest="readline", 
+                      help="Does not attempt to read the real line if provided a line number",
+                      action="store_false", default=True)
 
     return parser
 
@@ -275,7 +278,7 @@ if __name__ == '__main__':
         entry = results[0]
     else:
         try:
-            entry = select_entry(results, opts.num)
+            entry = select_entry(results, opts.num, opts.readline)
         except (KeyboardInterrupt,EOFError),e:
             sys.exit(1)
 
