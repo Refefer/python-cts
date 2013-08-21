@@ -6,6 +6,8 @@ Since 'cts' is only as good as your ctag files, it is recommended running ctags 
 
 Alternatively, one can add a new line, '--extra=+f', to ~/.ctags to set it as a default option for the ctags command.  This is likely a better solution as it will also work with scripts, editors, and other out-of-band processes.
 
+If provided a tags file with line numbers instead of patterns, 'cts' will attempt to read the line of code from the actual file.
+
 Example 1
 -------
     cts bar -i -c /some/directory/tags
