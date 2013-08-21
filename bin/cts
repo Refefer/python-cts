@@ -140,17 +140,19 @@ def build_flags(partial, insensitive):
 
 ENTRY_FIELDS = ("name", "file", "pattern", "lineNumber", "kind", "fileScope")
 Entry = namedtuple("Entry", ENTRY_FIELDS)
-def entry_to_Entry(entry):
-    return Entry(*(entry[f] for f in ENTRY_FIELDS))
+def entry_to_Entry(baseDir, entry):
+    ed = dict((f, entry[f]) for f in ENTRY_FIELDS)
+    ed['file'] = os.path.join(baseDir, ed['file'])
+    return Entry(**ed)
 
-def query_tag_file(tags, query, partial, insensitive):
+def query_tag_file(baseDir, tags, query, partial, insensitive):
     entry = ctags.TagEntry()
     flags = build_flags(partial, insensitive)
 
     if tags.find(entry, query, flags):
-        yield entry_to_Entry(entry)
+        yield entry_to_Entry(baseDir, entry)
         while tags.findNext(entry):
-            yield entry_to_Entry(entry)
+            yield entry_to_Entry(baseDir, entry)
 
 def read_line_at(f, num):
     return next(islice(f, num - 1, num), None)
@@ -199,14 +201,6 @@ def single_format_entry(i, entry, details, width):
         results.append(idetails)
 
     return '\n'.join(results)
-
-"""
-def multi_format_entry(i, entry, details, width):
-    fields = (entry.name, entry.file, details)
-    line_prefix = " %d: %s" % (i, entry.name)
-    offset = len(line_prefix)
-    return " %d: %s" % (i,'\t'.join(fields))
-"""
 
 def get_columns():
     # Attempt to get the columns of the terminal session
@@ -258,12 +252,12 @@ def select_entry(entries, num, surrounding=True):
         elif results == 'p' and idx > 0:
             idx -= 1
 
-def get_all_entries(tag_file):
+def get_all_entries(baseDir, tag_file):
     entry = ctags.TagEntry()
     if tags.first(entry):
-        yield entry_to_Entry(entry)
+        yield entry_to_Entry(baseDir, entry)
         while tags.next(entry):
-            yield entry_to_Entry(entry)
+            yield entry_to_Entry(baseDir, entry)
  
 def validate(tag_file):
     # we need attempt to verify that the file is actually a ctags file
@@ -303,11 +297,12 @@ if __name__ == '__main__':
 
     query = args[0]
     tags = ctags.CTags(tag_file)
+    baseDir = os.path.split(tag_file)[0]
     if not opts.partial:
-        results = query_tag_file(tags, query, 
+        results = query_tag_file(baseDir, tags, query, 
                                  opts.prefix, opts.insensitive)
     else:
-        results = get_all_entries(tags)
+        results = get_all_entries(baseDir, tags)
 
     # filter results
     entryFilter = EntryFilter()
