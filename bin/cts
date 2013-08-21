@@ -156,6 +156,11 @@ def read_line_at(f, num):
     return next(islice(f, num - 1, num), None)
 
 def get_details(cache, entry, surrounding):
+    # If a file, print nothing
+    if entry.kind == 'F':
+        return None
+
+    # If -R or not a real line
     if not surrounding or entry.lineNumber == 0:
         return entry.pattern
 
@@ -165,7 +170,7 @@ def get_details(cache, entry, surrounding):
             response = read_line_at(f, lineNum)
             if response is None or entry.name not in response:
                 response = entry.pattern
-            cache[entry] = response
+            cache[entry] = response.strip()
     
     return cache[entry]
 
@@ -185,9 +190,15 @@ def indent(s, indent):
     return s.rjust(len(s) + indent)
 
 def single_format_entry(i, entry, details, width):
-    line_prefix = " %d:    %s" % (i, entry.name)
-    filename = truncate_filename(entry.file, width - len(line_prefix))
-    return "%s\t%s\n%s" % (line_prefix, filename, indent(details, len(line_prefix)))
+    line_prefix = " %d:  %s" % (i, entry.name)
+    filename = truncate_filename(entry.file, width - len(line_prefix)-2)
+    results = ["%s  %s" % (line_prefix, filename)]
+
+    if details is not None:
+        idetails = indent(details, line_prefix.index(':')+5)
+        results.append(idetails)
+
+    return '\n'.join(results)
 
 """
 def multi_format_entry(i, entry, details, width):
