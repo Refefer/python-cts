@@ -145,18 +145,41 @@ def query_tag_file(tags, query, partial, insensitive):
         while tags.findNext(entry):
             yield entry_to_Entry(entry)
 
-def select_entry(entries, num):
+def read_line_at(f, num):
+    return next(islice(f, num - 1, num), None)
+
+def get_details(cache, entry, surrounding):
+    if not surrounding or entry.lineNumber == 0:
+        return entry.pattern
+
+    if entry not in cache:
+        lineNum = entry.lineNumber
+        with file(entry.file) as f:
+            response = read_line_at(f, lineNum)
+            if response is None or entry.name not in response:
+                response = entry.pattern
+            cache[entry] = response
+    
+    return cache[entry]
+
+def select_entry(entries, num, surrounding=True):
+    # Filter out entries for files that no longer exist
+    entries = [e for e in entries if os.path.isfile(e.file)]
     idx = 0
+
     # display in chunks of num
     i_entries = list(enumerate(entries))
+    line_cache = {}
+    print "Found %d entries" % len(i_entries)
     while True:
         print_set = []
         midx = idx * num
         for i, entry in i_entries[midx:midx+num]:
-            fields = (entry.name, entry.file, entry.pattern)
+            details = get_details(line_cache, entry, surrounding)
+            fields = (entry.name, entry.file, details)
             print_set.append(" %d: %s" % (i,'\t'.join(fields)))
             
-        instructions = ["Select number to open"]
+        instructions = ["Select #"]
         not_at_end = (midx + num) < len(entries)
         if not_at_end:
             instructions.append("'m' for more")
@@ -173,10 +196,11 @@ def select_entry(entries, num):
             linenum = int(results)
             if linenum < len(entries):
                 return entries[linenum]
+
         elif results == 'm' and not_at_end:
             idx += 1
         elif results == 'p' and idx > 0:
-            idx -=1
+            idx -= 1
 
 def get_all_entries(tag_file):
     entry = ctags.TagEntry()
