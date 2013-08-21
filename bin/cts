@@ -135,9 +135,10 @@ def build_flags(partial, insensitive):
     case = ctags.TAG_IGNORECASE if insensitive else ctags.TAG_OBSERVECASE
     return search_type | case
 
-Entry = namedtuple("Entry", "name, file, pattern, lineNumber, kind, fileScope")
+ENTRY_FIELDS = ("name", "file", "pattern", "lineNumber", "kind", "fileScope")
+Entry = namedtuple("Entry", ENTRY_FIELDS)
 def entry_to_Entry(entry):
-    return Entry(*(entry[f] for f in Entry._fields))
+    return Entry(*(entry[f] for f in ENTRY_FIELDS))
 
 def query_tag_file(tags, query, partial, insensitive):
     entry = ctags.TagEntry()
@@ -283,9 +284,11 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Prepare execution of script
+    variables = dict((k,getattr(entry,k)) for k in ENTRY_FIELDS)
+
+    # Override file for absolute path file
     tag_dir = os.path.split(tag_file)[0]
     filename = os.path.join(tag_dir, entry.file)
-    variables = entry.__dict__.copy()
     variables['file'] = filename 
     if opts.stdout is not None:
         print opts.stdout.format(**variables)
