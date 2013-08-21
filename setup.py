@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='python-cts',
-      version="0.1.7",
+      version="0.1.7.1",
       description='Command line ctag search',
       url="https://github.com/Refefer/python-cts",
       license="LICENSE",
