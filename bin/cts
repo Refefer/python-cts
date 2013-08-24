@@ -127,90 +127,132 @@ def find_ctag_file():
 
     return None
 
-def read_line_at(f, num):
-    return next(islice(f, num - 1, num), None)
+class EntryFormatter(object):
+    def format(self, entry):
+        raise NotImplementedError()
 
-def get_details(cache, entry, surrounding):
-    # If a file, print nothing
-    if entry.kind == 'F':
-        return None
-
-    # If -R or not a real line
-    if not surrounding or entry.lineNumber == 0:
-        return entry.pattern
-
-    if entry not in cache:
-        lineNum = entry.lineNumber
-        with file(entry.file) as f:
-            response = read_line_at(f, lineNum)
-            if response is None or entry.name not in response:
-                response = entry.pattern
-            cache[entry] = response.strip()
+class CompactEntryFormatter(object):
     
-    return cache[entry]
+    def __init__(self, surrounding=True):
+        self.detail_cache = {}
+        self.surrounding = surrounding
+        self.columns = self.get_columns()
 
-def truncate_filename(filename, length=70):
-    reduce_amt = len(filename) - length
+    def format(self, i, entry):
+        line_prefix = " %d:  %s" % (i, entry.name)
+        filename = self.truncate_middle(entry.file, self.columns - len(line_prefix)-2)
+        results = ["%s  %s" % (line_prefix, filename)]
 
-    if reduce_amt <= 0 or length <= 0:
-        return filename
+        if self.surrounding:
+            details = self.get_details(entry)
+            if details is not None:
+                idetails = self.indent(details, line_prefix.index(':')+5)
+                results.append(idetails)
 
-    reduce_amt += 3 # for the elipsis
+        return '\n'.join(results)
 
-    start = (len(filename) / 2) - (reduce_amt / 2)
-    end = start + reduce_amt
-    return "%s...%s" % (filename[:start], filename[end:])
 
-def indent(s, indent):
-    return s.rjust(len(s) + indent)
+    def read_line_at(self, f, num):
+        return next(islice(f, num - 1, num), None)
 
-def single_format_entry(i, entry, details, width):
-    line_prefix = " %d:  %s" % (i, entry.name)
-    filename = truncate_filename(entry.file, width - len(line_prefix)-2)
-    results = ["%s  %s" % (line_prefix, filename)]
+    def get_details(self, entry):
+        # If a file, print nothing
+        if entry.kind == 'F':
+            return None
 
-    if details is not None:
-        idetails = indent(details, line_prefix.index(':')+5)
-        results.append(idetails)
+        # If -R or not a real line
+        if entry.lineNumber == 0:
+            return entry.pattern
 
-    return '\n'.join(results)
+        if entry not in self.detail_cache:
+            lineNum = entry.lineNumber
+            with file(entry.file) as f:
+                response = self.read_line_at(f, lineNum)
+                if response is None:
+                    response = entry.pattern
+                self.detail_cache[entry] = response.strip()
+        
+        return self.detail_cache[entry]
 
-def get_columns():
-    # Attempt to get the columns of the terminal session
-    try:
-        return int(subprocess.check_output(['tput', 'cols']).strip())
-    except OSError:
-        return float('inf')
-    except ValueError:
-        # tput doesn't return an int?  
-        return float('inf')
+    def truncate_middle(self, line, length=70):
+        reduce_amt = len(line) - length
 
-def select_entry(entries, num, surrounding=True):
-    idx = 0
+        # If it already fits
+        if reduce_amt <= 0 or length <= 0:
+            return filename
 
-    columns = get_columns()
+        reduce_amt += 3 # for the ellipsis
 
-    # display in chunks of num
-    i_entries = list(enumerate(entries))
-    line_cache = {}
+        start = (len(line) / 2) - (reduce_amt / 2)
+        end = start + reduce_amt
+        return "%s...%s" % (line[:start], line[end:])
+
+    def indent(self, s, indent):
+        return s.rjust(len(s) + indent)
+
+    
+    def get_columns(self):
+        # Attempt to get the columns of the terminal session
+        try:
+            return int(subprocess.check_output(['tput', 'cols']).strip())
+        except OSError:
+            return float('inf')
+        except ValueError:
+            # tput doesn't return an int?  
+            return float('inf')
+
+class Paginator(object):
+    curPage = 0
+    def __init__(self, entries, pageSize):
+        self.entries = list(entries)
+        self.pageSize = pageSize
+
+    def __len__(self):
+        return len(self.entries)
+
+    def __iter__(self):
+        for i in xrange(self.getStartIndex(), self.getEndIndex()):
+            yield (i, self.entries[i])
+
+    def getStartIndex(self):
+        return self.curPage * self.pageSize
+
+    def getEndIndex(self):
+        return min(self.getStartIndex() + self.pageSize, len(self.entries))
+
+    def getCurrentPage(self):
+        return self.entries[self.getStartIndex():self.getEndIndex()]
+
+    def hasNextPage(self):
+        return (self.pageSize * (self.curPage + 1)) <= len(self.entries)
+
+    def nextPage(self):
+        self.curPage += 1
+
+    def hasPrevPage(self):
+        return self.curPage > 0
+
+    def prevPage(self):
+        self.curPage -= 1
+
+def select_entry(paginator, formatter):
+
     while True:
         print_set = []
-        midx = idx * num
-        for i, entry in i_entries[midx:midx+num]:
-            details = get_details(line_cache, entry, surrounding)
-            fields = (entry.name, entry.file, details)
-            print_set.append(single_format_entry(i, entry, details, columns))
+        for i, entry in paginator:
+            print_set.append(formatter.format(i, entry))
 
         instructions = ["Select #"]
-        not_at_end = (midx + num) < len(entries)
-        if not_at_end:
+        if paginator.hasNextPage():
             instructions.append("'m' for more")
-        if idx > 0:
+        if paginator.hasPrevPage():
             instructions.append("'p' for prev")
 
         print '\n\n'.join(print_set)
         print
-        print "%d - %d of %d entries" % (midx, midx+num, len(i_entries))
+        print "%d - %d of %d entries" % (paginator.getStartIndex(), 
+                                         paginator.getEndIndex(),
+                                         len(paginator))
         print ', '.join(instructions)
 
         # Get the input
@@ -220,10 +262,10 @@ def select_entry(entries, num, surrounding=True):
             if linenum < len(entries):
                 return entries[linenum]
 
-        elif results == 'm' and not_at_end:
-            idx += 1
-        elif results == 'p' and idx > 0:
-            idx -= 1
+        elif results == 'm' and paginator.hasNextPage():
+            paginator.nextPage()
+        elif results == 'p' and paginator.hasPrevPage():
+            paginator.prevPage()
 
 def validate(tag_file):
     # we need attempt to verify that the file is actually a ctags file
@@ -237,7 +279,7 @@ def validate(tag_file):
 
 ENTRY_FIELDS = ("name", "file", "pattern", "lineNumber", "kind", "fileScope")
 Entry = namedtuple("Entry", ENTRY_FIELDS)
-class TagSearcher(object):
+class TagScanner(object):
 
     def __init__(self, tag_file, base_dir, **opts):
         self.tag_file = tag_file
@@ -251,7 +293,7 @@ class TagSearcher(object):
         ed['file'] = os.path.join(self.base_dir, ed['file'])
         return Entry(**ed)
 
-class FullScanSearcher(TagSearcher):
+class FullTagScanner(TagScanner):
     def query(self, query):
         entry = ctags.TagEntry()
         if tags.first(entry):
@@ -259,24 +301,24 @@ class FullScanSearcher(TagSearcher):
             while tags.next(entry):
                 yield self.entry_to_Entry(entry)
 
-class PartialScanSearcher(FullScanSearcher):
+class PartialTagScanner(FullTagScanner):
     def __init__(self, tag_file, base_dir, insensitive=False, **opts):
-        super(FullScanSearcher, self).__init__(tag_file, base_dir)
+        super(FullTagScanner, self).__init__(tag_file, base_dir)
         self.insensitive=insensitive
         
     def query(self, query):
         if self.insensitive:
             query = query.lower()
 
-        for entry in super(PartialScanSearcher, self).query(query):
+        for entry in super(PartialTagScanner, self).query(query):
             tag = entry.name.lower() if self.insensitive else entry.name
             if query in tag: 
                 yield entry
 
-class IndexedScanSearcher(TagSearcher):
+class IndexedTagScanner(TagScanner):
 
     def __init__(self, tag_file, base_dir, prefix=False, insensitive=False, **opts):
-        super(IndexedScanSearcher, self).__init__(tag_file, base_dir)
+        super(IndexedTagScanner, self).__init__(tag_file, base_dir)
         self.prefix = prefix
         self.insensitive = insensitive
 
@@ -295,9 +337,8 @@ class IndexedScanSearcher(TagSearcher):
                 yield self.entry_to_Entry(entry)
 
 #class CTS(object):
-#    def __init__(self, output, tagSearcher):
+#    def __init__(self, output, tagScanner):
 
-    
 if __name__ == '__main__':
     parser = build_arg_parser()
     opts, args = parser.parse_args()
@@ -329,9 +370,9 @@ if __name__ == '__main__':
     baseDir = os.path.split(tag_file)[0]
 
     if opts.partial:
-        ts = PartialScanSearcher(tags, baseDir, opts.insensitive)
+        ts = PartialTagScanner(tags, baseDir, opts.insensitive)
     else:
-        ts = IndexedScanSearcher(tags, baseDir, opts.prefix, opts.insensitive)
+        ts = IndexedTagScanner(tags, baseDir, opts.prefix, opts.insensitive)
 
     # filter results
     entryFilter = EntryFilter(opts.kinds, opts.types)
@@ -346,7 +387,9 @@ if __name__ == '__main__':
         entry = results[0]
     else:
         try:
-            entry = select_entry(results, opts.num, opts.readline)
+            formatter = CompactEntryFormatter(opts.readline)
+            paginator = Paginator(results, opts.num)
+            entry = select_entry(paginator, formatter)
         except (KeyboardInterrupt,EOFError),e:
             sys.exit(1)
 
