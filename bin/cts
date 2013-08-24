@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from  __future__ import print_function
 import sys
 import subprocess
 import shlex
@@ -251,12 +252,12 @@ def select_entry(paginator, formatter):
         if paginator.hasPrevPage():
             instructions.append("'p' for prev")
 
-        print '\n\n'.join(print_set)
-        print
-        print "%d - %d of %d entries" % (paginator.getStartIndex(), 
+        print('\n\n'.join(print_set))
+        print()
+        print("%d - %d of %d entries" % (paginator.getStartIndex(), 
                                          paginator.getEndIndex(),
-                                         len(paginator))
-        print ', '.join(instructions)
+                                         len(paginator)))
+        print(', '.join(instructions))
 
         # Get the input
         results = raw_input("> ")
@@ -293,7 +294,7 @@ class TagScanner(object):
 
     def entry_to_Entry(self, entry):
         ed = dict((f, entry[f]) for f in ENTRY_FIELDS)
-        ed['file'] = os.path.join(self.base_dir, ed['file'])
+        ed['file'] = os.path.abspath(os.path.join(self.base_dir, ed['file']))
         return Entry(**ed)
 
 class FullTagScanner(TagScanner):
@@ -344,25 +345,25 @@ if __name__ == '__main__':
     opts, args = parser.parse_args()
 
     if opts.listkinds:
-        print "Tag Kinds"
+        print("Tag Kinds")
         for k in sorted(KINDS.iterkeys()):
-            print "%s\t%s" % (k, KINDS[k])
+            print("%s\t%s" % (k, KINDS[k]))
 
         sys.exit(0)
 
     if not args:
-        print "Missing search string"
+        print("Missing search string")
         parser.print_usage()
         sys.exit(1)
 
     # find the nearest ctag file
     tag_file = opts.tag_file or find_ctag_file()
     if tag_file is None or not os.path.isfile(tag_file):
-        print "Could not find tag_file"
+        print("Could not find tag_file")
         sys.exit(1)
     
     if not validate(tag_file) and not options.force:
-        print "file %s Does not look like a ctag file.  Aborting." % tag_file
+        print("file %s Does not look like a ctag file.  Aborting." % tag_file)
         sys.exit(1)
 
     query = args[0]
@@ -379,7 +380,7 @@ if __name__ == '__main__':
     results = list(entryFilter.ifilter(ts.query(query)))
     
     if not results:
-        print "No tags for `%s` found." % query
+        print("No tags for `%s` found." % query)
         sys.exit(0)
     
     entry = None
@@ -401,7 +402,7 @@ if __name__ == '__main__':
     filename = os.path.join(tag_dir, entry.file)
     variables['file'] = filename 
     if opts.stdout is not None:
-        print opts.stdout.format(**variables)
+        print(opts.stdout.format(**variables))
         sys.exit(0)
 
     pieces = shlex.split(opts.execute.format(**variables))
