@@ -214,6 +214,9 @@ class Paginator(object):
         for i in xrange(self.getStartIndex(), self.getEndIndex()):
             yield (i, self.entries[i])
 
+    def __getitem__(self, i):
+        return self.entries[i]
+
     def getStartIndex(self):
         return self.curPage * self.pageSize
 
@@ -259,8 +262,8 @@ def select_entry(paginator, formatter):
         results = raw_input("> ")
         if results.isdigit():
             linenum = int(results)
-            if linenum < len(entries):
-                return entries[linenum]
+            if linenum < len(paginator):
+                return paginator[linenum]
 
         elif results == 'm' and paginator.hasNextPage():
             paginator.nextPage()
@@ -335,9 +338,6 @@ class IndexedTagScanner(TagScanner):
             yield self.entry_to_Entry(entry)
             while tags.findNext(entry):
                 yield self.entry_to_Entry(entry)
-
-#class CTS(object):
-#    def __init__(self, output, tagScanner):
 
 if __name__ == '__main__':
     parser = build_arg_parser()
