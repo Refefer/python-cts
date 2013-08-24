@@ -1,3 +1,4 @@
 include bin/cts 
+include cts/TagScanner.py
 include README.md LICENSE
 include setup.py setup.cfg 

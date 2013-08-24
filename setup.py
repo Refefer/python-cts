@@ -3,9 +3,10 @@
 from setuptools import setup
 
 setup(name='python-cts',
-      version="0.1.7.6",
+      version="0.1.7.7",
       description='Command line ctag search',
       url="https://github.com/Refefer/python-cts",
+      py_modules=['cts'],
       license="LICENSE",
       scripts=['bin/cts'],
       author='Andrew Stanton',
