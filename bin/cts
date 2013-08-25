@@ -182,7 +182,7 @@ class CompactEntryFormatter(object):
 
         # If it already fits
         if reduce_amt <= 0 or length <= 0:
-            return filename
+            return line 
 
         reduce_amt += 3 # for the ellipsis
 
@@ -305,7 +305,7 @@ if __name__ == '__main__':
         print("Could not find tag_file")
         sys.exit(1)
     
-    if not validate(tag_file) and not options.force:
+    if not (validate(tag_file) or options.force):
         print("file %s Does not look like a ctag file.  Aborting." % tag_file)
         sys.exit(1)
 
